@@ -6,23 +6,30 @@ import {
   aws_s3_deployment,
   CfnOutput,
   RemovalPolicy,
+  StackProps,
 } from "aws-cdk-lib";
 
 const path = "./resources/build";
 
 export class DeploymentService extends Construct {
-  constructor(scope: Construct, id: string) {
+  constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id);
 
-    const hostingBucket = new aws_s3.Bucket(this, "FrontendBucket", {
-      blockPublicAccess: aws_s3.BlockPublicAccess.BLOCK_ALL,
-      removalPolicy: RemovalPolicy.DESTROY,
-      autoDeleteObjects: true,
-    });
+    const branchTag = props?.tags?.branch || "";
+
+    const hostingBucket = new aws_s3.Bucket(
+      this,
+      `FrontendBucket-${branchTag}`,
+      {
+        blockPublicAccess: aws_s3.BlockPublicAccess.BLOCK_ALL,
+        removalPolicy: RemovalPolicy.DESTROY,
+        autoDeleteObjects: true,
+      },
+    );
 
     const distribution = new aws_cloudfront.Distribution(
       this,
-      "FrontendDistribution",
+      `FrontendDistribution-${branchTag}`,
       {
         defaultBehavior: {
           origin:
@@ -43,23 +50,27 @@ export class DeploymentService extends Construct {
       },
     );
 
-    new aws_s3_deployment.BucketDeployment(this, "FrontendDeployment", {
-      sources: [aws_s3_deployment.Source.asset(path)],
-      destinationBucket: hostingBucket,
-      distribution,
-      distributionPaths: ["/*"],
-    });
+    new aws_s3_deployment.BucketDeployment(
+      this,
+      `FrontendDeployment-${branchTag}`,
+      {
+        sources: [aws_s3_deployment.Source.asset(path)],
+        destinationBucket: hostingBucket,
+        distribution,
+        distributionPaths: ["/*"],
+      },
+    );
 
-    new CfnOutput(this, "CloudFrontURL", {
+    new CfnOutput(this, `CloudFrontURL-${branchTag}`, {
       value: distribution.domainName,
       description: "The URL of the CloudFront distribution",
-      exportName: "CloudfrontURL",
+      exportName: `CloudfrontURL-${branchTag}`,
     });
 
-    new CfnOutput(this, "BucketName", {
+    new CfnOutput(this, `BucketName-${branchTag}`, {
       value: hostingBucket.bucketName,
       description: "The name of the S3 bucket",
-      exportName: "BucketName",
+      exportName: `BucketName-${branchTag}`,
     });
   }
 }
